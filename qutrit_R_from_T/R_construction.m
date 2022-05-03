@@ -26,35 +26,37 @@ h = (kron(kpl, k0') + kron(kw, k1') + kron(kwsq, k2'));   % H // Def.8
 cx = [I zero zero; zero x zero; zero zero x'];   % CX, i.e. tau(10 11 12)(20 22 21) // Def.10
 
 %% various other Clifford gates
-tau0_1 = [0 1 0; 1 0 0; 0 0 1]; % tau(0 1) // Sec.2.1
-tau0_2 = [0 0 1; 0 1 0; 1 0 0]; % tau(0 2) // Sec.2.1
+tau0_1 = [0 1 0; 1 0 0; 0 0 1]; % tau(0 1)  // Sec.2.1
+tau0_2 = [0 0 1; 0 1 0; 1 0 0]; % tau(0 2)  // Sec.2.1
 tau1_2 = [1 0 0; 0 0 1; 0 1 0]; % tau(1 2) = H * H up to a global phase of -1 // Sec.2.1; Def.8
-zww = tau1_2 * s * tau1_2 * s; % = [1 0 0; 0 w 0; 0 0 w] // Def.6
+z01 = diag([1,1,w]);            % Z(0,1)    // Def.6
+z22 = diag([1,w^2,w^2]);        % Z(2,2)    // Def.6
 swap = II(:, [1 4 7 2 5 8 3 6 9]);  % two-qutrit SWAP gate
 
 %% the T gate
-t = [1 0 0; 0 w^(1/3) 0; 0 0 w^(-1/3)]; % T // Def.13
+t = diag([1,w^(1/3),w^(-1/3)]); % T // Def.13
 
 %%  Controlled gates from the paper "Factoring with Qutrits: Shor’s
 %   Algorithm on Ternary and Metaplectic Quantum Architectures"
-p9 = x * t * x';    % the P9 gate, which is Clifford equivalent to T
-qubitCqutritZe = cx * kron(I,p9) * cx * kron(I,p9) * cx * kron(I,p9);
-tcx = kron(x',h'*x') * qubitCqutritZe * kron(x,x*h); % tau(20 21 22) // Lem.17
-ocx = kron(x',I) * tcx * kron(x,I); % tau(10 11 12)
+zcz = cx * kron(I,t) * cx * kron(I,t) * cx * kron(I,t); % |0>-controlled Z // Eq.10
+ocx = kron(x,h') * zcz * kron(x',h); % tau(10 11 12)
+tcx = kron(x,I) * ocx * kron(x',I); % tau(20 21 22)
 socxs = swap * ocx * swap; % tau(01 11 21)
 tau02_20 = swap * socxs * ocx * socxs * ocx * socxs; % tau(02 20)
 map21_22to02_20 = swap * cx' * swap * kron(I,tau0_1);
-tctau1_2 = map21_22to02_20' * tau02_20 * map21_22to02_20;   % |2>-controlled tau(1 2), i.e. tau(21 22) // Lem.18
+tctau1_2 = map21_22to02_20' * tau02_20 * map21_22to02_20;   % |2>-controlled tau(1 2), i.e. tau(21 22) // Lem.17
 
-%% |2>-controlled w^(1/3) * s' gate
-tcsdagphase = kron(I,tau0_1*t*tau0_1) * tcx' * kron(I,tau0_1*t'*tau0_1) * tcx; % // Lem.19
-%% |2>-controlled w^(-2/3) * zww gate
-tczwwphase = kron(I,tau0_2) * tcsdagphase * kron(I,tau0_2); % Cor.20
+%% |2>-controlled w^(-1/3) * S gate where S = Z(0,1)
+tcsphase = tcx' * kron(I,tau0_1*t*tau0_1) * tcx * kron(I,tau0_1*t'*tau0_1); % // Lem.18
+%% |2>-controlled w^(2/3) * Z(2,2) gate
+tcz22phase = kron(I,tau0_2) * tcsphase * kron(I,tau0_2); % Cor.19
+%% |2>-controlled -H gate
+tcmh = tcz22phase * kron(I,h')*tcz22phase*kron(I,h) * tcz22phase * kron(s,I);   % // Lem.20
 %% |2>-controlled -tau(1 2) gate, i.e. tctau1_2 but when the control is |2>, the target gains a -1 phase
-tcmtau1_2 = kron(s',zww*h') * tczwwphase * kron(I,h*zww) * tczwwphase * kron(I,h') * tczwwphase * kron(I,h*zww); % // Thm.22
+tcmtau1_2 = kron(z01,z22*h') * tcz22phase * kron(I,h*z22) * tcz22phase * kron(I,h') * tcz22phase * kron(I,h*z22); % // Thm.21
 
 %% the below two-qutrit Clifford+T unitary is the R gate on one qutrit and the identity gate on the other
 rtensorid = tcmtau1_2 * tctau1_2;
 %% to verify: subtracting the R gate tensor the single-qutrit identity from it equals zero
-r = [1 0 0; 0 1 0; 0 0 -1];
+r = diag([1,1,-1]); % R gate, i.e. the metaplectic gate
 assert(all(all(round(rtensorid,10) - kron(r,I) == 0))) % rounding to the 10^(-10) decimal place due to floating point error
